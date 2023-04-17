@@ -1,0 +1,294 @@
+name: bottles
+adopt-info: bottles
+summary: Run Windows software
+description: |
+  Run Windows software on Linux with Bottles!
+  Bottle software and enjoy at your leisure!
+  Our built-in dependency installation system grants automatic software
+  compatibility access. Use the download manager to download the official components:
+    the runner (Wine, Proton), DXVK, dependencies, etc.
+  Bottle versioning keeps your work safe now and lets you restore it later!
+  Features:
+    * Create bottles using preconfigured environments or create your own
+    * Run executables (.exe/.msi) in your bottles, directly from the context menu of your file-manager
+    * Automated detection of applications installed in your bottles
+    * Add environment variables quickly
+    * Override DLLs directly from per-bottle preferences
+    * On-the-fly runner change for any Bottle
+    * Various gaming-performance optimizations (esync, fsync, DXVK, cache, shader compiler, offload … and much more.)
+    * Automatic installation and management of Wine and Proton runners
+    * Automatic bottle repair in case of breakage
+    * Integrated dependency-installer based on a community-driven repository
+    * Integrated Task manager for Wine processes
+    * Access to ProtonDB and WineHQ for support
+    * System for bringing your configuration to new versions of Bottles
+    * Back up and import bottles
+    * Import Wine prefixes from other managers
+    * Bottles versioning (experimental)
+    * ... and much more that you can find by installing Bottles!
+
+base: core22
+confinement: strict
+grade: stable
+license: GPL-3.0+
+
+architectures:
+  - build-on: [amd64]
+
+plugs:
+  gtk-3-themes:
+    interface: content
+    target: $SNAP/data-dir/themes
+    default-provider: gtk-common-themes
+  icon-themes:
+    interface: content
+    target: $SNAP/data-dir/icons
+    default-provider: gtk-common-themes
+  sound-themes:
+    interface: content
+    target: $SNAP/data-dir/sounds
+    default-provider: gtk-common-themes
+  gaming-mesa:
+    interface: content
+    target: $SNAP/graphics
+    default-provider: gaming-graphics-core22
+  shmem:
+    interface: shared-memory
+    private: true
+
+layout:
+  /usr/share/zenity:
+    bind: $SNAP/usr/share/zenity
+  # https://discourse.ubuntu.com/t/the-graphics-core20-snap-interface/23000
+  /usr/share/libdrm:
+    bind: $SNAP/graphics/usr/share/libdrm
+  /usr/share/drirc.d:
+    bind: $SNAP/graphics/usr/share/drirc.d
+  /usr/share/glvnd/egl_vendor.d:
+    bind: $SNAP/graphics/usr/share/glvnd/egl_vendor.d
+  /usr/lib/x86_64-linux-gnu/alsa-lib:
+    bind: $SNAP/usr/lib/x86_64-linux-gnu/alsa-lib
+  /usr/share/alsa:
+    bind: $SNAP/usr/share/alsa
+  /usr/share/X11/xkb:
+    bind: $SNAP/usr/share/X11/xkb
+  /usr/lib/x86_64-linux-gnu/libvulkan_intel.so:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libvulkan_intel.so
+  /usr/lib/i386-linux-gnu/libvulkan_intel.so:
+    symlink: $SNAP/graphics/usr/lib/i386-linux-gnu/libvulkan_intel.so
+  /usr/lib/x86_64-linux-gnu/libvulkan_lvp.so:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so
+  /usr/lib/i386-linux-gnu/libvulkan_lvp.so:
+    symlink: $SNAP/graphics/usr/lib/i386-linux-gnu/libvulkan_lvp.so
+  /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libvulkan_radeon.so
+  /usr/lib/i386-linux-gnu/libvulkan_radeon.so:
+    symlink: $SNAP/graphics/usr/lib/i386-linux-gnu/libvulkan_radeon.so
+  /usr/lib/x86_64-linux-gnu/libxcb-dri3.so.0.0.0:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libxcb-dri3.so.0.0.0
+  /usr/lib/x86_64-linux-gnu/libxcb-dri3.so.0:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libxcb-dri3.so.0.0.0
+  /usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+  /usr/lib/x86_64-linux-gnu/libxcb.so:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+  /usr/lib/x86_64-linux-gnu/libxcb.so.1:
+    symlink: $SNAP/graphics/usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+  /etc/ld.so.cache:
+    bind-file: $SNAP_DATA/etc/ld.so.cache
+  /usr/share/bottles:
+    bind: $SNAP/usr/share/bottles
+  /usr/lib/x86_64-linux-gnu/webkit2gtk-4.0/WebKitNetworkProcess:
+    bind-file: $SNAP/usr/lib/x86_64-linux-gnu/webkit2gtk-4.0/WebKitNetworkProcess
+  /usr/lib/p7zip:
+    bind: $SNAP/usr/lib/p7zip
+
+hooks:
+  configure:
+    plugs:
+      - opengl
+
+parts:
+  launcher:
+    plugin: nil
+    source : snap/local
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/bin
+      cp desktop-launch $CRAFT_PART_INSTALL/bin/
+
+  alsa-mixin:
+    plugin: dump
+    source: https://github.com/diddlesnaps/snapcraft-alsa.git
+    source-subdir: snapcraft-assets
+    build-packages:
+      - libasound2-dev
+    stage-packages:
+      - libasound2
+      - libasound2-plugins
+      - yad
+    stage:
+      # restrict to only audio-related files - you need to ensure
+      # that gtk3 is staged for yad to work correctly, to prompt
+      # users to connect the alsa plug or proceed with pulseaudio.
+      #
+      # This helps prevent symbol conflicts in situations where
+      # you're using a non-default library, such as those that the
+      # gnome-3-34 extension for core18 provides.
+      - etc/asound.conf
+      - snap/command-chain/alsa-launch
+      - usr/bin/yad*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/alsa-lib
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libasound*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libdnsfile*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libFLAC*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libjack*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libpulse*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libsamplerate*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libspeex*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/libvorbis*
+      - usr/lib/$CRAFT_ARCH_TRIPLET/pulseaudio
+      - usr/share/alsa
+
+  meson-deps:
+    plugin: nil
+    source: https://github.com/mesonbuild/meson.git
+    override-build:
+      # Install on the host
+      pip install .
+    build-packages:
+      - python3-pip
+      - ninja-build
+
+  bottles:
+    after: [ alsa-mixin, meson-deps ]
+    plugin: meson
+    meson-parameters: [ --prefix=/usr ]
+    source: https://github.com/bottlesdevs/Bottles.git
+    parse-info: [usr/share/metainfo/com.usebottles.bottles.appdata.xml]
+    override-pull: |
+      craftctl default
+      craftctl set version=$(git describe --tags --abbrev=8)
+      sed -i -e 's|@PYTHON@|/usr/bin/python3|g' bottles/frontend/bottles.py
+    build-packages:
+      - blueprint-compiler
+      - cmake
+      - desktop-file-utils
+      - gettext
+      - libglib2.0-dev
+      - libglib2.0-dev-bin
+      - python3
+      - python3-distutils
+      - python3-pytoml
+      - python3-requests
+      - gir1.2-glib-2.0
+      - gir1.2-gtk-4.0
+      - gir1.2-webkit2-4.0
+      - gir1.2-gtksource-5
+      - gir1.2-xdp-1.0
+      - gir1.2-xdpgtk4-1.0
+      - libglib2.0-0
+    stage-packages:
+      - python3-gi
+      - python3-gi-cairo
+      - python3-markdown
+      - gamemode
+      - libgamemode0
+      - winbind
+      - cabextract
+      - p7zip
+      - p7zip-full
+      - xz-utils
+      - patool
+      - xdg-utils
+      - fontconfig-config
+      - fontconfig:i386
+      - fontconfig:amd64
+      - pciutils
+      - gir1.2-glib-2.0
+      - gir1.2-gtk-4.0
+      - gir1.2-webkit2-4.0
+      - gir1.2-gtksource-5
+      - gir1.2-xdp-1.0
+      - gir1.2-xdpgtk4-1.0
+      - libglib2.0-0
+      - libglib2.0-bin
+      - samba-libs
+    organize:
+      snap/bottles/current/usr: usr
+    prime:
+      - -etc/fonts
+      - -usr/share/doc
+      - -usr/share/man
+      - -usr/share/bug
+      - -usr/share/gdb
+      - -usr/share/emacs*
+      - -usr/share/lintian
+      - -usr/share/drirc.d
+      - -usr/share/vulkan
+      - -usr/share/Xsession.d
+      - -usr/lib/*/dri
+      - -usr/lib/*/vdpau
+      - -usr/lib/*/libvkd3d*
+      - -usr/lib/*/libvulkan*
+      - -usr/lib/*/libVk*
+      - -usr/lib/*/libLLVM*
+    build-snaps: [core22]
+    override-prime: |
+      craftctl default
+      set -eux
+      cp -a /snap/core22/current/usr/lib/i386-linux-gnu/* usr/lib/i386-linux-gnu/
+
+  cleanup:
+    after: [bottles]
+    plugin: nil
+    build-snaps:
+      - gaming-graphics-core22/kisak-fresh/candidate
+    override-prime: |
+      set -eux
+      cd /snap/gaming-graphics-core22/current/usr/lib
+      find . -type f,l -exec rm -f $CRAFT_PRIME/usr/lib/{} \;
+      cd /snap/gaming-graphics-core22/current/usr/share
+      find . -type f,l -exec rm -f $CRAFT_PRIME/usr/share/{} \;
+  
+apps:
+  bottles:
+    command-chain: [ bin/desktop-launch ]
+    command: usr/bin/bottles
+    desktop: usr/share/applications/com.usebottles.bottles.desktop
+    common-id: com.usebottles.bottles.desktop
+    environment:
+      HOME: $SNAP_USER_COMMON
+      PYTHONPATH: ${PYTHONPATH}:$SNAP/usr/lib/python3/dist-packages
+      GI_TYPELIB_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/girepository-1.0
+      XDG_DATA_DIRS: $SNAP/usr/share:/usr/share:$XDG_DATA_DIRS
+      GSETTINGS_SCHEMA_DIR: $SNAP/usr/share/glib-2.0/schemas
+      TMPDIR: $XDG_RUNTIME_DIR
+      ALWAYS_USE_PULSEAUDIO: 1
+      DISABLE_WAYLAND: 1
+
+    plugs:
+      - home
+      - gsettings
+      - network
+      - audio-playback
+      - audio-record
+      - removable-media
+      - shmem
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - opengl
+      - process-control
+      - hardware-observe
+      - mount-observe
+      - system-observe
+      - hostname-control
+    slots:
+      - dbus-bottles
+
+slots:
+  dbus-bottles:
+    interface: dbus
+    bus: session
+    name: com.usebottles.bottles
